@@ -1,2 +1,2 @@
 # game-bala-de-canhao
-Este projeto é uma atividade acadêmica da disciplina de Computação Gráfica e apresenta um jogo no qual um canhão dispara projéteis para derrubar objetos no cenário. A aplicação utiliza Three.js para renderizar gráficos 3D e a ferramenta Vite para otimizar o processo de desenvolvimento.
+A proposta deste projeto da disciplina de Computação Gráfica é desenvolver uma simulação em física e aplicar um sistema de partículas usando o Three.js. Isso foi feito por meio de um jogo no qual um canhão dispara projéteis para derrubar objetos no cenário que quando atingidos geram uma explosão.
