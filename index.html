@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Jogo</title>
+    <style>
+      body { margin: 0; overflow: hidden; }
+      /* HUD para exibir pontuação e fase */
+      #hud {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: white;
+        font-family: Arial, sans-serif;
+        z-index: 5;
+      }
+      /* Tela de início */
+      #start-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 10;
+      }
+      #start-button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HUD: Pontuação e Fase -->
+    <div id="hud">
+      <div id="score">Pontuação: 0</div>
+      <div id="level">Fase: 1</div>
+    </div>
+    <!-- Tela de início -->
+    <div id="start-screen">
+      <h1>Bem-vindo ao Jogo</h1>
+      <button id="start-button">Iniciar</button>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+    </body>
+</html>
