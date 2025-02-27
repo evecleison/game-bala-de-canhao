@@ -1,266 +1,368 @@
 import * as THREE from 'three';
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import * as CANNON from 'cannon-es';
 
-// Configuração da cena, câmera e renderizador
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-document.body.style.cursor = 'none';
-
-// Carregador de textura para partículas e caixas
-const textureLoader = new THREE.TextureLoader();
-const particleTexture = textureLoader.load('/sprite-explosion.png');
-const boxTexture = textureLoader.load('/caixa.jpg');
-
-// Elementos do HUD
-const scoreElement = document.getElementById('score');
-const levelElement = document.getElementById('level');
-
-// Configuração da física
-const world = new CANNON.World();
-world.gravity.set(0, -9.82, 0);
-
-// Chão
-const groundGeometry = new THREE.PlaneGeometry(100, 100);
-const groundMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-scene.add(ground);
-
-const groundBody = new CANNON.Body({
-  mass: 0,
-  shape: new CANNON.Plane(),
-});
-groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-world.addBody(groundBody);
-
-// Canhão – com a rotação inicial para apontar para o eixo negativo Z
-const cannonGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
-cannonGeometry.rotateX(Math.PI / 2);
-const cannonMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
-const cannon = new THREE.Mesh(cannonGeometry, cannonMaterial);
-cannon.position.set(0, 1, 0);
-cannon.rotation.y = Math.PI;
-scene.add(cannon);
-
-// Arrays para alvos e seus corpos físicos
-const targets = [];
-const targetBodies = [];
-
-// Projéteis
-const projectileGeometry = new THREE.SphereGeometry(0.2, 32, 32);
-const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-const projectiles = [];
-const projectileBodies = [];
-
-// Sistema de partículas
-const particleCount = 100;
-const particles = new THREE.BufferGeometry();
-const positions = new Float32Array(particleCount * 3);
-particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-const particleMaterial = new THREE.PointsMaterial({ 
-  map: particleTexture, 
-  transparent: true, 
-  size: 0.1 
-});
-const particleSystem = new THREE.Points(particles, particleMaterial);
-scene.add(particleSystem);
-
-// Variáveis de pontuação e fase
+// Variáveis globais do jogo
+let scene, camera, renderer, controls, world;
+let cannonMesh, cannonBody;
+let projectiles = [];
+let boxes = [];
 let score = 0;
-let currentLevel = 1;
+let level = 1;
+let levelTimer = 60; // segundos para cada nível
+let lastShotTime = 0;
+const shotCooldown = 3000; // 3 segundos de recarga
 
-// Função para criar os alvos (grupos de caixas empilhadas)
-function createTargets(level) {
-  const numTargets = level * 5;
-  // Remove alvos anteriores, se houver
-  targets.forEach(t => scene.remove(t));
-  targetBodies.forEach(b => world.removeBody(b));
-  targets.length = 0;
-  targetBodies.length = 0;
+// Áudios 
+const cannonSound = new Audio('/cannonball.mp3');
+const explosionSound = new Audio('/medium-explosion.mp3');
+
+// Inicialização
+init();
+animate();
+
+function init() {
+  // Cena e câmera
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb); // Céu azul claro
+
+  camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.set(0, 2, 2);
+
+  // Renderizador
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Iluminação
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight.position.set(10, 10, 5);
+  scene.add(directionalLight);
+
+  // Inicializa o mundo físico
+  world = new CANNON.World();
+  world.gravity.set(0, -9.82, 0);
+  world.broadphase = new CANNON.SAPBroadphase(world);
+
+  // Campo
+  const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+  const groundGeometry = new THREE.PlaneGeometry(100, 100);
+  const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+  groundMesh.rotation.x = -Math.PI / 2;
+  scene.add(groundMesh);
+
+  const groundBody = new CANNON.Body({
+    mass: 0,
+    shape: new CANNON.Plane()
+  });
+  groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+  world.addBody(groundBody);
+
+  // Criação do canhão
+  const cannonGeometry = new THREE.CylinderGeometry(0.2, 0.4, 1, 32);
+  const cannonMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+  cannonMesh = new THREE.Mesh(cannonGeometry, cannonMaterial);
+  cannonMesh.position.set(0, 0.5, 0);
+  scene.add(cannonMesh);
+
+  // Posiciona o canhão de forma relativa à câmera
+  cannonMesh.position.set(0, -1, -2);
   
-  const numBoxesStack = 3;
-  const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
+  // Adiciona o canhão como filho da câmera para herdar suas rotações e movimentos
+  camera.add(cannonMesh);
+  scene.add(camera);
+
+  // Corpo físico do canhão
+  cannonBody = new CANNON.Body({ mass: 0 });
+  const cannonShape = new CANNON.Cylinder(0.2, 0.4, 1, 32);
+  cannonBody.addShape(cannonShape);
   
-  for (let i = 0; i < numTargets; i++) {
-    const group = new THREE.Group();
-    for (let j = 0; j < numBoxesStack; j++) {
-      const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), boxMaterial);
-      box.position.set(0, j, 0);
-      group.add(box);
-    }
-    const x = (i - (numTargets - 1) / 2) * 2;
-    group.position.set(x, 0.5, -10);
-    scene.add(group);
-    targets.push(group);
-    
-    // Corpo físico composto para o grupo
-    const compoundBody = new CANNON.Body({ mass: numBoxesStack });
-    for (let j = 0; j < numBoxesStack; j++) {
-      const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-      compoundBody.addShape(shape, new CANNON.Vec3(0, j, 0));
-    }
-    compoundBody.position.set(x, 0.5, -10);
-    world.addBody(compoundBody);
-    targetBodies.push(compoundBody);
-  }
-  if (levelElement) {
-    levelElement.textContent = `Fase: ${level}`;
-  }
+  // Configura os controles com Pointer Lock
+  controls = new PointerLockControls(camera, renderer.domElement);
+  document.addEventListener('click', () => {
+    controls.lock();
+    // Ao clicar, dispara o canhão
+    fireProjectile();
+  });
+
+  // Configura o nível atual (os alvos)
+  setupLevel(level);
+
+  // Cria a interface simples para pontuação e cronômetro
+  createUI();
 }
 
-// Inicializa a primeira fase
-createTargets(currentLevel);
+function createUI() {
+  const uiContainer = document.createElement('div');
+  uiContainer.id = 'ui';
+  uiContainer.style.position = 'absolute';
+  uiContainer.style.top = '10px';
+  uiContainer.style.left = '10px';
+  uiContainer.style.color = 'white';
+  uiContainer.style.fontFamily = 'Arial';
+  uiContainer.innerHTML = `<div id="score">Pontos: ${score}</div>
+                           <div id="timer">Tempo: ${levelTimer}</div>`;
+  document.body.appendChild(uiContainer);
+}
 
-// Controle de mira com mouse e atualização da câmera
-document.addEventListener('mousemove', (event) => {
+function updateUI() {
+  document.getElementById('score').innerText = `Pontos: ${score}`;
+  document.getElementById('timer').innerText = `Tempo: ${Math.max(
+    0,
+    Math.floor(levelTimer)
+  )}`;
+}
+
+function setupLevel(lvl) {
+  // Remove caixas do nível anterior
+  boxes.forEach(b => {
+    scene.remove(b.mesh);
+    world.removeBody(b.body);
+  });
+  boxes = [];
+
+  // Exemplo: Nível 1 = 5 caixas; Nível 10 = 30 caixas
+  const numBoxes = 5 + Math.floor((lvl - 1) * (25 / 9));
+  for (let i = 0; i < numBoxes; i++) {
+    const boxSize = 0.5;
+    const boxGeometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
+    const boxMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
+
+    // Posiciona as caixas de forma aleatória (em pilhas simples)
+    const x = (Math.random() - 0.5) * 10;
+    const z = - (Math.random() * 20 + 5);
+    const y = boxSize / 2 + (i % 3) * boxSize; // empilhamento de até 3 caixas
+    boxMesh.position.set(x, y, z);
+    scene.add(boxMesh);
+
+    // Corpo físico da caixa
+    const boxShape = new CANNON.Box(new CANNON.Vec3(boxSize / 2, boxSize / 2, boxSize / 2));
+    const boxBody = new CANNON.Body({ mass: 1 });
+    boxBody.addShape(boxShape);
+    boxBody.position.copy(boxMesh.position);
+    world.addBody(boxBody);
+
+    boxes.push({ mesh: boxMesh, body: boxBody });
+  }
+
+  // Reinicia o cronômetro para o nível
+  levelTimer = 60;
+}
+
+function onMouseMove(event) {
+  // Atualiza a direção do canhão com base na posição do mouse
   const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-  const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-  const yaw = mouseX * Math.PI + Math.PI;
-  const pitch = mouseY * Math.PI / 4;
-  cannon.rotation.set(pitch, yaw, 0);
-  const direction = new THREE.Vector3(
-    Math.sin(yaw) * Math.cos(pitch),
-    Math.sin(pitch),
-    Math.cos(yaw) * Math.cos(pitch)
-  );
-  const cameraOffset = new THREE.Vector3(0, 2, 5);
-  camera.position.copy(cannon.position).add(cameraOffset);
-  camera.lookAt(cannon.position.clone().add(direction));
-});
-
-// Movimentação do canhão com teclado (A, D ou setas)
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'a' || event.key === 'ArrowLeft') {
-    cannon.position.x -= 0.1;
-  } else if (event.key === 'd' || event.key === 'ArrowRight') {
-    cannon.position.x += 0.1;
-  }
-});
-
-// Disparo de projéteis
-document.addEventListener('click', () => {
-  const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-  projectile.position.copy(cannon.position);
-  scene.add(projectile);
-  projectiles.push(projectile);
-
-  const projectileBody = new CANNON.Body({
-    mass: 1,
-    position: new CANNON.Vec3(cannon.position.x, cannon.position.y, cannon.position.z),
-    shape: new CANNON.Sphere(0.2),
-  });
-
-  const yaw = cannon.rotation.y;
-  const pitch = cannon.rotation.x;
-  const shootDirection = new CANNON.Vec3(
-    Math.sin(yaw) * Math.cos(pitch),
-    Math.sin(pitch),
-    Math.cos(yaw) * Math.cos(pitch)
-  );
-  shootDirection.scale(10, shootDirection);
-  projectileBody.velocity.copy(shootDirection);
-  world.addBody(projectileBody);
-  projectileBodies.push(projectileBody);
-
-  // Verifica colisões com os alvos
-  projectileBody.addEventListener('collide', (event) => {
-    const targetIndex = targetBodies.findIndex(body => body === event.body);
-    if (targetIndex !== -1) {
-      // Remove o projétil
-      scene.remove(projectile);
-      if (world.bodies.includes(projectileBody)) {
-        world.removeBody(projectileBody);
-      }
-      const projectileIndex = projectileBodies.indexOf(projectileBody);
-      if (projectileIndex !== -1) {
-        projectiles.splice(projectileIndex, 1);
-        projectileBodies.splice(projectileIndex, 1);
-      }
-
-      // Remove o grupo de caixas atingido
-      scene.remove(targets[targetIndex]);
-      if (world.bodies.includes(targetBodies[targetIndex])) {
-        world.removeBody(targetBodies[targetIndex]);
-      }
-      targets.splice(targetIndex, 1);
-      targetBodies.splice(targetIndex, 1);
-
-      // Atualiza a pontuação
-      score += 10;
-      if (scoreElement) {
-        scoreElement.textContent = `Pontuação: ${score}`;
-      }
-      explodeParticles(event.body.position);
-
-      // Se não houver mais alvos, passa para a próxima fase
-      if (targets.length === 0) {
-        currentLevel++;
-        createTargets(currentLevel);
-      }
-    }
-  });
-});
-
-// Função para explosão de partículas
-function explodeParticles(position) {
-  const posArray = particles.attributes.position.array;
-  for (let i = 0; i < particleCount; i++) {
-    posArray[i * 3] = position.x + (Math.random() - 0.5) * 2;
-    posArray[i * 3 + 1] = position.y + (Math.random() - 0.5) * 2;
-    posArray[i * 3 + 2] = position.z + (Math.random() - 0.5) * 2;
-  }
-  particles.attributes.position.needsUpdate = true;
+  // Rotaciona de forma simples 
+  cannonMesh.rotation.y = mouseX * Math.PI;
 }
 
-// Loop de animação
+function fireProjectile() {
+  const now = performance.now();
+  if (now - lastShotTime < shotCooldown) {
+    console.log("Recarregando...");
+    return;
+  }
+  lastShotTime = now;
+  cannonSound.play();
+
+  // Cria o projétil
+  const sphereRadius = 0.1;
+  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 16, 16);
+  const sphereMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+  const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+  // Define a posição da ponta do canhão em coordenadas locais (por exemplo, 1 unidade à frente)
+  const localTip = new THREE.Vector3(0, 0, -1);
+  // Converte para coordenadas do mundo, já que o canhão é filho da câmera
+  cannonMesh.localToWorld(localTip);
+  sphereMesh.position.copy(localTip);
+  scene.add(sphereMesh);
+
+  // Corpo físico do projétil
+  const sphereShape = new CANNON.Sphere(sphereRadius);
+  const sphereBody = new CANNON.Body({ mass: 0.1 });
+  sphereBody.addShape(sphereShape);
+  sphereBody.position.copy(sphereMesh.position);
+  world.addBody(sphereBody);
+
+  // Calcula a direção do projétil com base na rotação do canhão
+  const cannonWorldQuat = new THREE.Quaternion();
+  cannonMesh.getWorldQuaternion(cannonWorldQuat);
+
+  // Vetor apontando para frente no espaço local do canhão
+  const forward = new THREE.Vector3(0, 0, -1);
+  // Aplica a rotação mundial do canhão para obter a direção correta
+  forward.applyQuaternion(cannonWorldQuat);
+  forward.normalize();
+  forward.multiplyScalar(15); // Ajuste a velocidade conforme necessário
+
+  sphereBody.velocity.set(forward.x, forward.y, forward.z);
+  projectiles.push({ mesh: sphereMesh, body: sphereBody });
+}
+
 function animate() {
   requestAnimationFrame(animate);
-  world.step(1 / 60);
+  const delta = 1 / 60;
+  world.step(delta);
 
-  // Atualiza as posições dos alvos com base na física
-  targets.forEach((target, index) => {
-    if (targetBodies[index]) {
-      target.position.copy(targetBodies[index].position);
-      target.quaternion.copy(targetBodies[index].quaternion);
+  // Atualiza a posição dos projéteis
+  projectiles.forEach((p, i) => {
+    p.mesh.position.copy(p.body.position);
+    if (p.mesh.position.length() > 100) {
+      scene.remove(p.mesh);
+      world.removeBody(p.body);
+      projectiles.splice(i, 1);
     }
   });
-  // Atualiza as posições dos projéteis
-  projectiles.forEach((projectile, index) => {
-    if (projectileBodies[index]) {
-      projectile.position.copy(projectileBodies[index].position);
-      projectile.quaternion.copy(projectileBodies[index].quaternion);
-    }
-  });
-  // Atualiza a câmera para seguir o canhão
-  const currentYaw = cannon.rotation.y;
-  const currentPitch = cannon.rotation.x;
-  const currentDirection = new THREE.Vector3(
-    Math.sin(currentYaw) * Math.cos(currentPitch),
-    Math.sin(currentPitch),
-    Math.cos(currentYaw) * Math.cos(currentPitch)
-  );
-  const cameraOffset = new THREE.Vector3(0, 2, 5);
-  camera.position.copy(cannon.position).add(cameraOffset);
-  camera.lookAt(cannon.position.clone().add(currentDirection));
 
+  // Atualiza a posição e rotação das caixas
+  boxes.forEach(b => {
+    b.mesh.position.copy(b.body.position);
+    b.mesh.quaternion.copy(b.body.quaternion);
+  });
+
+  // Verifica colisões entre projéteis e caixas
+  projectiles.forEach(p => {
+    boxes.forEach((b, index) => {
+      const distance = p.mesh.position.distanceTo(b.mesh.position);
+      if (distance < 0.5) {
+        explosionSound.play();
+        triggerExplosion(b.mesh.position);
+        scene.remove(b.mesh);
+        world.removeBody(b.body);
+        boxes.splice(index, 1);
+        score++;
+      }
+    });
+  });
+
+  // Atualiza o cronômetro do nível
+  levelTimer -= delta;
+  if (levelTimer <= 0) {
+    showEndGame(false);
+  }
+
+  updateUI();
   renderer.render(scene, camera);
+
+  // Verifica se todas as caixas foram destruídas
+  if (boxes.length === 0) {
+    if (level < 10) {
+      // Exibe um menu para avançar para o próximo nível
+      showNextLevelMenu(level + 1);
+    } else {
+      // Se for o último nível, exibe a vitória
+      showEndGame(true);
+    }
+  }
 }
 
-// Controle da tela de início: só inicia o jogo ao clicar no botão "Iniciar"
-const startScreen = document.getElementById('start-screen');
-const startButton = document.getElementById('start-button');
 
-function startGame() {
-  startScreen.style.display = 'none';
-  animate();
+function triggerExplosion(position) {
+  // Aqui poderia ter colocado um efeito visual na explosão
+  console.log("Explosão em:", position);
 }
 
-startButton.addEventListener('click', startGame);
+// Flag para evitar a criação múltipla de menus
+let menuAtivo = false;
+
+function showEndGame(victory) {
+  // Libera o Pointer Lock para permitir interação com a UI
+  if (controls.isLocked) {
+    controls.unlock();
+  }
+
+  if (menuAtivo) return; // Evita múltiplas instâncias
+  menuAtivo = true;
+
+  // Cria o container do menu final
+  const endMenu = document.createElement('div');
+  endMenu.id = "endMenu";
+  endMenu.style.cssText = `
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    z-index: 999;
+  `;
+  
+  if (victory) {
+    endMenu.innerHTML = `
+      <h1>Parabéns!</h1>
+      <p>Pontuação final: ${score}</p>
+      <button id="restartBtn">Recomeçar</button>
+    `;
+  } else {
+    endMenu.innerHTML = `
+      <h1>Tempo Esgotado</h1>
+      <p>Nível alcançado: ${level}</p>
+      <p>Pontuação: ${score}</p>
+      <button id="restartBtn">Recomeçar</button>
+    `;
+  }
+  
+  document.body.appendChild(endMenu);
+
+  // Associa o evento de clique ao botão "Recomeçar"
+  const restartBtn = document.getElementById('restartBtn');
+  restartBtn.addEventListener('click', () => {
+    // Remove o menu e reinicia o jogo
+    endMenu.remove();
+    location.reload();
+  });
+}
+
+function showNextLevelMenu(nextLevel) {
+  // Libera o Pointer Lock para permitir interação com a UI
+  if (controls.isLocked) {
+    controls.unlock();
+  }
+
+  if (menuAtivo) return;
+  menuAtivo = true;
+
+  // Cria o container do menu de próximo nível
+  const nextMenu = document.createElement('div');
+  nextMenu.id = "nextLevelMenu";
+  nextMenu.style.cssText = `
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    z-index: 999;
+  `;
+  
+  nextMenu.innerHTML = `
+    <h1>Nível ${nextLevel}</h1>
+    <button id="nextLevelBtn">OK</button>
+  `;
+  
+  document.body.appendChild(nextMenu);
+
+  // Associa o evento de clique ao botão "OK"
+  const nextLevelBtn = document.getElementById('nextLevelBtn');
+  nextLevelBtn.addEventListener('click', () => {
+    // Remove o menu e inicia o próximo nível
+    nextMenu.remove();
+    menuAtivo = false; // Reseta a flag para permitir novos menus
+    level = nextLevel;
+    setupLevel(level);
+    controls.lock();
+  });
+}
