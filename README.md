@@ -16,25 +16,21 @@ Siga os passos abaixo para configurar e executar o projeto em sua máquina local
 
    Use o Git para clonar este repositório em sua máquina local.
    ```shell
-   git clone https://github.com/evecleisonce
+   https://github.com/evecleison/game-bala-de-canhao.git
 
 3. **Abra o projeto pelo Visual Studio Code**
 
 4. **Instale as Dependências**
 
-    No terminal do VS Code ou em seu terminal de escolha, navegue até a pasta do projeto e instale as dependências necessárias, que incluem os pacotes three.js e o Vite:
+    Como no repositório há o arquivo `package.json` configurado no projeto, basta rodar o seguinte comando para instalar os pacotes do Three.js, cannon-es e Vite:
     ```shell
-    npm install --save three
-   ```
-    ```shell
-    npm install --save-dev vite
-   ```
+    npm install
 
 5. **Execute o Projeto**
 
    Após a instalação de todos os pacotes necessários, você pode iniciar o projeto executando o seguinte comando:
-     ```shell
-     npx vite
-     ```
+   ```shell
+   npx vite
+   ```
 
    Para visualizar a cena gerada, basta acessar em seu navegador o link: [http://localhost:5173/](http://localhost:5173/).
