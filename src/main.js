@@ -12,92 +12,92 @@ let level = 1;
 let levelTimer = 60; // segundos para cada nível
 let lastShotTime = 0;
 const shotCooldown = 3000; // 3 segundos de recarga
+let explosions = [];
+let smokeTexture; // textura para a fumaça
 
 // Áudios 
-const cannonSound = new Audio('/cannonball.mp3');
-const explosionSound = new Audio('/medium-explosion.mp3');
+const cannonSound = new Audio('/audio/cannonball.mp3');
+const explosionSound = new Audio('/audio/medium-explosion.mp3');
 
-// Inicialização
-init();
-animate();
+// Criação da textura da fumaça
+const textureLoader = new THREE.TextureLoader();
+smokeTexture = textureLoader.load('/textures/smoke.png');
 
-function init() {
-  // Cena e câmera
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb); // Céu azul claro
 
-  camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-  camera.position.set(0, 2, 2);
+// Cena e câmera
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb); // Céu azul claro
+camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  50
+);
+camera.position.set(0, 2, 2);
 
-  // Renderizador
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+// Renderizador
+renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-  // Iluminação
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-  scene.add(ambientLight);
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(10, 10, 5);
-  scene.add(directionalLight);
+// Iluminação
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+directionalLight.position.set(10, 10, 5);
+scene.add(directionalLight);
 
-  // Inicializa o mundo físico
-  world = new CANNON.World();
-  world.gravity.set(0, -9.82, 0);
-  world.broadphase = new CANNON.SAPBroadphase(world);
+// Inicializa o mundo físico
+world = new CANNON.World();
+world.gravity.set(0, -9.82, 0);
+world.broadphase = new CANNON.SAPBroadphase(world);
 
-  // Campo
-  const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
-  const groundGeometry = new THREE.PlaneGeometry(100, 100);
-  const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
-  groundMesh.rotation.x = -Math.PI / 2;
-  scene.add(groundMesh);
+// Campo
+const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+const groundGeometry = new THREE.PlaneGeometry(100, 100);
+const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+groundMesh.rotation.x = -Math.PI / 2;
+scene.add(groundMesh);
 
-  const groundBody = new CANNON.Body({
-    mass: 0,
-    shape: new CANNON.Plane()
-  });
-  groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-  world.addBody(groundBody);
+const groundBody = new CANNON.Body({
+  mass: 0,
+  shape: new CANNON.Plane()
+});
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(groundBody);
 
-  // Criação do canhão
-  const cannonGeometry = new THREE.CylinderGeometry(0.2, 0.4, 1, 32);
-  const cannonMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
-  cannonMesh = new THREE.Mesh(cannonGeometry, cannonMaterial);
-  cannonMesh.position.set(0, 0.5, 0);
-  scene.add(cannonMesh);
+// Criação do canhão
+const cannonGeometry = new THREE.CylinderGeometry(0.2, 0.4, 1, 32);
+const cannonMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+cannonMesh = new THREE.Mesh(cannonGeometry, cannonMaterial);
+cannonMesh.position.set(0, 0.5, 0);
+scene.add(cannonMesh);
 
-  // Posiciona o canhão de forma relativa à câmera
-  cannonMesh.position.set(0, -1, -2);
-  
-  // Adiciona o canhão como filho da câmera para herdar suas rotações e movimentos
-  camera.add(cannonMesh);
-  scene.add(camera);
+// Posiciona o canhão de forma relativa à câmera
+cannonMesh.position.set(0, -1, -2);
 
-  // Corpo físico do canhão
-  cannonBody = new CANNON.Body({ mass: 0 });
-  const cannonShape = new CANNON.Cylinder(0.2, 0.4, 1, 32);
-  cannonBody.addShape(cannonShape);
-  
-  // Configura os controles com Pointer Lock
-  controls = new PointerLockControls(camera, renderer.domElement);
-  document.addEventListener('click', () => {
-    controls.lock();
-    // Ao clicar, dispara o canhão
-    fireProjectile();
-  });
+// Adiciona o canhão como filho da câmera para herdar suas rotações e movimentos
+camera.add(cannonMesh);
+scene.add(camera);
 
-  // Configura o nível atual (os alvos)
-  setupLevel(level);
+// Corpo físico do canhão
+cannonBody = new CANNON.Body({ mass: 0 });
+const cannonShape = new CANNON.Cylinder(0.2, 0.4, 1, 32);
+cannonBody.addShape(cannonShape);
 
-  // Cria a interface simples para pontuação e cronômetro
-  createUI();
-}
+// Configura os controles com Pointer Lock
+controls = new PointerLockControls(camera, renderer.domElement);
+document.addEventListener('click', () => {
+  controls.lock();
+  // Ao clicar, dispara o canhão
+  fireProjectile();
+});
+
+// Configura o nível atual 
+setupLevel(level);
+
+// Cria a interface simples para pontuação e cronômetro
+createUI();
 
 function createUI() {
   const uiContainer = document.createElement('div');
@@ -202,7 +202,7 @@ function fireProjectile() {
   // Aplica a rotação mundial do canhão para obter a direção correta
   forward.applyQuaternion(cannonWorldQuat);
   forward.normalize();
-  forward.multiplyScalar(15); // Ajuste a velocidade conforme necessário
+  forward.multiplyScalar(15); 
 
   sphereBody.velocity.set(forward.x, forward.y, forward.z);
   projectiles.push({ mesh: sphereMesh, body: sphereBody });
@@ -250,6 +250,26 @@ function animate() {
     showEndGame(false);
   }
 
+  // Formação das partículas
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    const group = explosions[i];
+    group.children.forEach(sprite => {
+      // Atualiza a posição com base na velocidade
+      sprite.position.addScaledVector(sprite.userData.velocity, delta);
+      // Diminui o tempo de vida da partícula
+      sprite.userData.lifetime -= delta;
+      // Ajusta a opacidade para simular o desvanecimento
+      sprite.material.opacity = Math.max(0, sprite.userData.lifetime / 1.5);
+      // Aumenta o tamanho para simular a expansão da fumaça
+      sprite.scale.multiplyScalar(1 + delta);
+    });
+    // Se todas as partículas do grupo tiverem esgotado o tempo de vida, remove o grupo
+    if (group.children.every(sprite => sprite.userData.lifetime <= 0)) {
+      scene.remove(group);
+      explosions.splice(i, 1);
+    }
+  }
+
   updateUI();
   renderer.render(scene, camera);
 
@@ -266,9 +286,32 @@ function animate() {
 }
 
 
+// Função da explosão
 function triggerExplosion(position) {
-  // Aqui poderia ter colocado um efeito visual na explosão
-  console.log("Explosão em:", position);
+  const explosionGroup = new THREE.Group();
+  const particleCount = 20; // número de partículas de fumaça
+  for (let i = 0; i < particleCount; i++) {
+    const material = new THREE.SpriteMaterial({
+      map: smokeTexture,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const sprite = new THREE.Sprite(material);
+    sprite.position.copy(position);
+    sprite.scale.set(0.5, 0.5, 0.5);
+    // Define uma direção aleatória e velocidade para cada partícula
+    const direction = new THREE.Vector3(
+      (Math.random() - 0.5),
+      (Math.random() - 0.5),
+      (Math.random() - 0.5)
+    ).normalize();
+    sprite.userData = { velocity: direction.multiplyScalar(2), lifetime: 1.5 }; // vida de 1.5 segundos
+    explosionGroup.add(sprite);
+  }
+  scene.add(explosionGroup);
+  explosions.push(explosionGroup);
 }
 
 // Flag para evitar a criação múltipla de menus
@@ -366,3 +409,5 @@ function showNextLevelMenu(nextLevel) {
     controls.lock();
   });
 }
+
+animate();
