@@ -1,6 +1,6 @@
 // vite.config.js
 export default {
-    base: '/game-bala-de-canhao/',
+    base: '/docs/',
     build: {
       outDir: 'docs',
     },
