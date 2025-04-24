@@ -1,10 +1,14 @@
-# game-bala-de-canhao
+# Game Bala de Canhão
+
+📌 This document is written in Brazilian Portuguese. For the English version, see the file [README-en.md](/README-en.md).
+
+A maior parte do código utiliza nomes de variáveis, funções, etc., em inglês, enquanto os comentários do código e o conteúdo textual da interface e das páginas estão em português brasileiro.
+
+## Descrição do projeto
+
 A proposta deste projeto da disciplina de Computação Gráfica é desenvolver uma simulação em física e aplicar um sistema de partículas usando o Three.js. Isso foi feito por meio de um jogo no qual um canhão dispara projéteis para destruir objetos no cenário que quando atingidos geram uma explosão.
 
-**Autor**
-- Evecleison Albuquerque do Nascimento
-
-Siga os passos abaixo para configurar e executar o projeto em sua máquina local:
+## 🔧 Instalação e Execução
 
 1. **Instale o Node.js**
 
@@ -28,6 +32,7 @@ Siga os passos abaixo para configurar e executar o projeto em sua máquina local
     Como no repositório há o arquivo `package.json` configurado no projeto, basta rodar o seguinte comando para instalar os pacotes do Three.js, cannon-es e Vite:
     ```shell
     npm install
+    ```
 
 5. **Execute o Projeto**
 
@@ -37,3 +42,20 @@ Siga os passos abaixo para configurar e executar o projeto em sua máquina local
    ```
 
    Para visualizar a cena gerada, basta acessar em seu navegador o link: [http://localhost:5173/](http://localhost:5173/).
+
+## 🛠️ Tecnologias utilizadas
+
+- HTML
+- CSS
+- JavaScript
+- Three.js
+- Vite
+
+## 👨‍💻 Autor
+
+- Evecleison Albuquerque do Nascimento
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT.  
+Veja o arquivo [LICENSE](./LICENSE) para mais detalhes.
