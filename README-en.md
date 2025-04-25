@@ -4,6 +4,8 @@
 
 Most of the code uses English for variable names, functions, etc., while the code comments and the interface/page content are in Brazilian Portuguese.
 
+👉  [See the project in action](https://evecleison.github.io/game-bala-de-canhao/)
+
 ## Project Description
 
 This project was developed for the Computer Graphics course with the goal of creating a physics simulation and applying a particle system using Three.js. It takes the form of a game in which a cannon fires projectiles to destroy objects in the scene, which trigger explosions when hit.
