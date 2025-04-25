@@ -16,12 +16,12 @@ let explosions = [];
 let smokeTexture; // textura para a fumaça
 
 // Áudios 
-const cannonSound = new Audio('/audio/cannonball.mp3');
-const explosionSound = new Audio('/audio/medium-explosion.mp3');
+const cannonSound = new Audio('./audio/cannonball.mp3');
+const explosionSound = new Audio('./audio/medium-explosion.mp3');
 
 // Criação da textura da fumaça
 const textureLoader = new THREE.TextureLoader();
-smokeTexture = textureLoader.load('/textures/smoke.png');
+smokeTexture = textureLoader.load('./textures/smoke.png');
 
 
 // Cena e câmera
