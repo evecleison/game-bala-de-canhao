@@ -1,12 +1,10 @@
 # Game Bala de Canhão
 
-## 🚀 Deploy
-
-👉 [Veja o projeto em funcionamento](https://seu-link-deploy.com)
-
 📌 This document is written in Brazilian Portuguese. For the English version, see the file [README-en.md](/README-en.md).
 
 A maior parte do código utiliza nomes de variáveis, funções, etc., em inglês, enquanto os comentários do código e o conteúdo textual da interface e das páginas estão em português brasileiro.
+
+👉  [Veja o projeto em funcionamento](https://evecleison.github.io/game-bala-de-canhao/)
 
 ## Descrição do projeto
 
