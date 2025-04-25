@@ -1,5 +1,9 @@
 # Game Bala de Canhão
 
+## 🚀 Deploy
+
+[![Deploy](https://img.shields.io/badge/Ver%20Projeto-Online-blue?style=for-the-badge)](https://seu-link-deploy.com)
+
 📌 This document is written in Brazilian Portuguese. For the English version, see the file [README-en.md](/README-en.md).
 
 A maior parte do código utiliza nomes de variáveis, funções, etc., em inglês, enquanto os comentários do código e o conteúdo textual da interface e das páginas estão em português brasileiro.
