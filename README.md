@@ -2,7 +2,7 @@
 
 ## 🚀 Deploy
 
-[![Deploy](https://img.shields.io/badge/Ver%20Projeto-Online-blue?style=for-the-badge)](https://seu-link-deploy.com)
+👉 [Veja o projeto em funcionamento](https://seu-link-deploy.com)
 
 📌 This document is written in Brazilian Portuguese. For the English version, see the file [README-en.md](/README-en.md).
 
